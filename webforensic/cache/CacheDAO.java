@@ -1,10 +1,12 @@
 package cache;
 
 import util.CopyFile;
+import util.Time;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -51,6 +53,10 @@ public class CacheDAO {
             int i = 0;
             while (entry_addr[i] == -1) i++; // skip until not -1
 
+            Time time = Time.getInstance();
+            String time_str = time.subDays(days);
+            System.out.println("time_str: " + time_str);
+
             // parse each entry's data
             for (; i < entry_count; i++) {
                 if (entry_addr[i] < 0) continue;
@@ -62,9 +68,10 @@ public class CacheDAO {
                 data_1.read(entry_header);
 
                 // get create time
-                String time = getTimeString(entry_header);
-                if (time.equals("-1")) continue;
-                cache.setCreate_time(time);
+                String time_test = getTimeString(entry_header, time_str);
+                System.out.println("time_test: " + time_test);
+                if (time_test.equals("-1")) continue;
+                cache.setCreate_time(time_test);
 
                 // ready to parse url from key_data
                 byte test[] = new byte[1]; // check whether the key data exists.
@@ -96,7 +103,7 @@ public class CacheDAO {
 
             data_0.close();
             data_1.close();
-        } catch(IOException e) {
+        } catch(IOException | SQLException e) {
             e.printStackTrace();
         }
 
@@ -114,11 +121,15 @@ public class CacheDAO {
     }
 
     // convert Chrome Timestamp to readable time string
-    private static String getTimeString(byte[] header){
+    private static String getTimeString(byte[] header, String days) throws SQLException {
         long webKitTimestamp = 0;
         for(int i = 31; i >= 24; i--){
             webKitTimestamp = webKitTimestamp << 8;
             webKitTimestamp += Byte.toUnsignedInt(header[i]);
+        }
+
+        if(String.valueOf(webKitTimestamp).compareTo(days) < 0){
+            return "-1";
         }
 
         long epochStart = LocalDateTime
